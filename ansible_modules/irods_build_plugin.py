@@ -50,6 +50,14 @@ class GenericStrategy(object):
     def building_dependencies(self):
         pass
 
+    @abc.abstractmethod
+    def install_packages(self, packages):
+        pass
+
+    @abc.abstractmethod
+    def install_packages_from_file(self, packages):
+        pass
+
     @property
     def irods_packages_directory(self):
         return os.path.join(self.irods_packages_root_directory, get_irods_platform_string())
@@ -61,10 +69,10 @@ class GenericStrategy(object):
     def install_dev_and_runtime_packages(self):
         dev_package_basename = filter(lambda x:'irods-dev-' in x, os.listdir(self.irods_packages_directory))[0]
         dev_package = os.path.join(self.irods_packages_directory, dev_package_basename)
-        install_os_packages_from_files([dev_package])
+        self.install_packages_from_file([dev_package])
         runtime_package_basename = filter(lambda x:'irods-runtime-' in x, os.listdir(self.irods_packages_directory))[0]
         runtime_package = os.path.join(self.irods_packages_directory, runtime_package_basename)
-        install_os_packages_from_files([runtime_package])
+        self.install_packages_from_file([runtime_package])
 
     def build(self):
         self.install_building_dependencies()
@@ -73,7 +81,7 @@ class GenericStrategy(object):
         self.copy_build_output()
 
     def install_building_dependencies(self):
-        install_os_packages(self.building_dependencies)
+        self.install_packages(self.building_dependencies)
         self.install_dev_and_runtime_packages()
 
     def prepare_git_repository(self):
@@ -91,22 +99,70 @@ class GenericStrategy(object):
 class RedHatStrategy(GenericStrategy):
     @property
     def building_dependencies(self):
-        return ['git', 'g++', 'make', 'help2man', 'python-devel', 'unixODBC', 'fuse-devel', 'curl-devel', 'bzip2-devel', 'zlib-devel', 'pam-devel', 'openssl-devel', 'libxml2-devel', 'krb5-devel', 'unixODBC-devel', 'perl-JSON', 'globus-proxy-utils', 'globus-gssapi-gsi-devel']
+        return ['python-devel', 'help2man', 'unixODBC', 'fuse-devel', 'curl-devel', 'bzip2-devel', 'zlib-devel', 'pam-devel', 'openssl-devel', 'libxml2-devel', 'krb5-devel', 'unixODBC-devel', 'perl-JSON', 'globus-proxy-utils', 'globus-gssapi-gsi-devel']
+
+    def install_packages(self, packages):
+        install_command = 'sudo yum install -y {0}'.format(' '.join(packages))
+        self.module.run_command(install_command, check_rc=True)
+        # install hpss build dependencies
+        args = ['sudo', 'rpm', '-i', '/projects/irods/vsphere-testing/externals/hpss/hpss-lib-7.4.3.2-0.el6.x86_64.rpm']
+        self.module.run_command(args, check_rc=True)
+        args = ['sudo', 'rpm', '-i', '/projects/irods/vsphere-testing/externals/hpss/hpss-lib-devel-7.4.3.2-0.el6.x86_64.rpm']
+        self.module.run_command(args, check_rc=True)
+        args = ['sudo', 'rpm', '-i', '/projects/irods/vsphere-testing/externals/hpss/hpss-clnt-7.4.3.2-0.el6.x86_64.rpm']
+        self.module.run_command(args, check_rc=True)
+        # install hpss symlink
+        install_command = ['sudo', 'ln', '-s', '/hpss_src/hpss-7.4.3.2-0.el6', '/opt/hpss']
+        self.module.run_command(install_command, check_rc=True)
+        # fix gsi symlinks
+        # Centos_6
+        install_command = ['sudo', 'ln', '-s', '/usr/lib64/libglobus_callout.so.0', '/usr/lib64/libglobus_callout.so']
+        self.module.run_command(install_command, check_rc=True)
+        install_command = ['sudo', 'ln', '-s', '/usr/lib64/libglobus_gss_assist.so.3', '/usr/lib64/libglobus_gss_assist.so']
+        self.module.run_command(install_command, check_rc=True)
+
+    def install_packages_from_file(self, packages):
+        args = ['sudo', 'yum', 'localinstall', '-y', '--nogpgcheck'] + packages
+        self.module.run_command(args, check_rc=True)
 
 class DebianStrategy(GenericStrategy):
-    def install_building_dependencies(self):
-        self.module.run_command(['wget', 'http://toolkit.globus.org/ftppub/gt6/installers/repo/globus-toolkit-repo_latest_all.deb'], check_rc=True)
-        install_os_packages_from_files(['globus-toolkit-repo_latest_all.deb'])
-        super(DebianStrategy, self).install_building_dependencies()
-
     @property
     def building_dependencies(self):
-        return ['git', 'g++', 'make', 'help2man', 'python-dev', 'unixodbc', 'libfuse-dev', 'libcurl4-gnutls-dev', 'libbz2-dev', 'zlib1g-dev', 'libpam0g-dev', 'libssl-dev', 'libxml2-dev', 'libkrb5-dev', 'unixodbc-dev', 'libjson-perl', 'globus-gsi', 'libglobus-gsi-callback-dev', 'libglobus-gsi-proxy-core-dev', 'libglobus-gssapi-gsi-dev', 'libglobus-callout-dev', 'libglobus-gss-assist-dev']
+        return ['git', 'g++', 'make', 'python-dev', 'help2man', 'unixodbc', 'libfuse-dev', 'libcurl4-gnutls-dev', 'libbz2-dev', 'zlib1g-dev', 'libpam0g-dev', 'libssl-dev', 'libxml2-dev', 'libkrb5-dev', 'unixodbc-dev', 'libjson-perl', 'globus-proxy-utils', 'libglobus-gssapi-gsi-dev']
+
+    def install_packages(self, packages):
+        self.module.run_command('sudo apt-get update', check_rc=True)
+        install_command = 'sudo apt-get install -y {0}'.format(' '.join(packages))
+        self.module.run_command(install_command, check_rc=True)
+        # fix gsi symlinks
+        # Ubuntu_12
+        install_command = ['sudo', 'ln', '-s', '/usr/lib/libglobus_callout.so.0', '/usr/lib/libglobus_callout.so']
+        self.module.run_command(install_command, check_rc=True)
+        install_command = ['sudo', 'ln', '-s', '/usr/lib/libglobus_gss_assist.so.3', '/usr/lib/libglobus_gss_assist.so']
+        self.module.run_command(install_command, check_rc=True)
+        # Ubuntu_14
+        install_command = ['sudo', 'ln', '-s', '/usr/lib/x86_64-linux-gnu/libglobus_callout.so.0', '/usr/lib/x86_64-linux-gnu/libglobus_callout.so']
+        self.module.run_command(install_command, check_rc=True)
+        install_command = ['sudo', 'ln', '-s', '/usr/lib/x86_64-linux-gnu/libglobus_gss_assist.so.3', '/usr/lib/x86_64-linux-gnu/libglobus_gss_assist.so']
+        self.module.run_command(install_command, check_rc=True)
+
+    def install_packages_from_file(self, packages):
+        args = ['sudo', 'dpkg', '-i'] + packages
+        self.module.run_command(args) # no check_rc, missing deps return code 1
+        self.module.run_command('sudo apt-get update', check_rc=True)
+        self.module.run_command('sudo apt-get install -yf')
 
 class SuseStrategy(GenericStrategy):
     @property
     def building_dependencies(self):
-        return ['python-devel', 'unixODBC', 'fuse-devel', 'libcurl-devel', 'libbz2-devel', 'libopenssl-devel', 'libxml2-devel', 'krb5-devel', 'perl-JSON', 'unixODBC-devel']
+        return ['python-devel', 'help2man', 'unixODBC', 'fuse-devel', 'libcurl-devel', 'libbz2-devel', 'libopenssl-devel', 'libxml2-devel', 'krb5-devel', 'perl-JSON', 'unixODBC-devel']
+
+    def install_packages(self, packages):
+        args = ['sudo', 'zypper', '--non-interactive', 'install'] + packages
+        self.module.run_command(args, check_rc=True)
+
+    def install_packages_from_file(self, packages):
+        self.install_packages(packages)
 
 class CentOSBuilder(Builder):
     platform = 'Linux'
