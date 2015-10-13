@@ -36,11 +36,11 @@ def do_globus_config(module):
     create_test_configuration_json(irodsbuild_proxy_copy, irodsbuild_distinguished_name, module)
 
 def create_irodsbuild_certificate(module):
-    module.run_command(['grid-cert-request', '-nopw', '-force', '-cn', 'gsi_client_user'], check_rc=True)
-    module.run_command(['chmod', 'u+w', '.globus/userkey.pem'], check_rc=True)
+    module.run_command(['sudo', 'su', '-', 'irodsbuild', '-c', 'grid-cert-request -nopw -force -cn gsi_client_user'], check_rc=True)
+    module.run_command(['chmod', 'u+w', '~irodsbuild/.globus/userkey.pem'], check_rc=True)
     private_key_password = 'gsitest'
-    module.run_command(['openssl', 'rsa', '-in', '.globus/userkey.pem', '-out', '.globus/userkey.pem', '-des3', '-passout', 'pass:{0}'.format(private_key_password)], check_rc=True)
-    module.run_command(['chmod', '400', '.globus/userkey.pem'], check_rc=True)
+    module.run_command(['openssl', 'rsa', '-in', '.globus/userkey.pem', '-out', '~irodsbuild/.globus/userkey.pem', '-des3', '-passout', 'pass:{0}'.format(private_key_password)], check_rc=True)
+    module.run_command(['chmod', '400', '~irodsbuild/.globus/userkey.pem'], check_rc=True)
 
     temporary_certificate_location = '/tmp/gsicert'
     module.run_command(['sudo', 'su', '-s', '/bin/bash', '-c', 'grid-ca-sign -in ~irodsbuild/.globus/usercert_request.pem -out {0}'.format(temporary_certificate_location), 'simpleca'], check_rc=True)
@@ -74,7 +74,7 @@ def make_irods_readable_copy_of_irodsbuild_proxy(module):
     return irods_copy_of_proxy
 
 def get_irodsbuild_distinguished_name(module):
-    _, name, _ = module.run_command(['grid-cert-info', '-subject'], check_rc=True)
+    _, name, _ = module.run_command(['su', '-', 'irodsbuild', '-c', 'grid-cert-info -subject'], check_rc=True)
     return name.strip()
 
 def create_test_configuration_json(irodsbuild_proxy_copy, irodsbuild_distinguished_name, module):
@@ -84,15 +84,6 @@ def create_test_configuration_json(irodsbuild_proxy_copy, irodsbuild_distinguish
     with open(config_file, 'w') as f:
         json.dump(config, f)
     module.run_command(['sudo', 'chmod', '777', config_file], check_rc=True)
-
-def unknown_terrelling():
-    pass
-    # fix symlinks
-    # Ubuntu_14
-    #install_command = ['sudo', 'ln', '-s', '/usr/lib/x86_64-linux-gnu/libglobus_callout.so.0', '/usr/lib/x86_64-linux-gnu/libglobus_callout.so']
-    #module.run_command(install_command, check_rc=True)
-    #install_command = ['sudo', 'ln', '-s', '/usr/lib/x86_64-linux-gnu/libglobus_gss_assist.so.3', '/usr/lib/x86_64-linux-gnu/libglobus_gss_assist.so']
-    #module.run_command(install_command, check_rc=True)
 
 def main():
     module = AnsibleModule(
