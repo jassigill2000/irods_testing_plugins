@@ -39,12 +39,10 @@ def deploy_build_vms_return_names_and_ips(build_name, platform_targets, output_r
     return vm_names, ip_addresses
 
 def build_plugin_on_vms(ip_addresses, output_root_directory, irods_packages_root_directory, plugin_name, git_repository, git_commitish, platform_targets, debug_build):
-
     complex_args = {
         'output_root_directory': output_root_directory,
         'irods_packages_root_directory': irods_packages_root_directory,
         'plugin_name': plugin_name,
-        'target_os_list': platform_targets,
         'git_repository': git_repository,
         'git_commitish': git_commitish,
         'debug_build': debug_build,

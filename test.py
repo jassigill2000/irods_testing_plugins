@@ -9,7 +9,10 @@ import library
 def main(zone_bundle, deployment_name, packages_root_directory, plugin_root_directory, package_prefix, module_to_run, output_directory):
     logger = logging.getLogger(__name__)
     zone_bundle_output_file = os.path.join(output_directory, 'deployed_zone.json')
-    deployed_zone_bundle = library.deploy(zone_bundle, deployment_name, packages_root_directory, zone_bundle_output_file)
+    version_to_packages_map = {
+        'deployment-determined': packages_root_directory,
+    }
+    deployed_zone_bundle = library.deploy(zone_bundle, deployment_name, version_to_packages_map, zone_bundle_output_file)
     with library.deployed_zone_bundle_manager(deployed_zone_bundle):
         icat_ip = deployed_zone_bundle['zones'][0]['icat_server']['deployment_information']['ip_address']
 

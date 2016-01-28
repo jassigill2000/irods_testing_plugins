@@ -8,10 +8,10 @@ import shutil
 class UnimplementedStrategy(object):
     def __init__(self, module):
         self.module = module
-        self.unimplmented_error()
+        self.unimplemented_error()
 
     def build(self):
-        self.unimplmented_error()
+        self.unimplemented_error()
 
     def unimplemented_error(self):
         platform = get_platform()
@@ -135,9 +135,14 @@ class SuseStrategy(GenericStrategy):
     def building_dependencies(self):
         return ['python-devel', 'help2man', 'unixODBC', 'fuse-devel', 'libcurl-devel', 'libbz2-devel', 'libopenssl-devel', 'libxml2-devel', 'krb5-devel', 'perl-JSON', 'unixODBC-devel']
 
-class CentOSBuilder(Builder):
+class CentOS6Builder(Builder):
     platform = 'Linux'
     distribution = 'Centos'
+    strategy_class = RedHatStrategy
+
+class CentOS7Builder(Builder):
+    platform = 'Linux'
+    distribution = 'Centos linux'
     strategy_class = RedHatStrategy
 
 class UbuntuBuilder(Builder):
@@ -156,7 +161,6 @@ def main():
             output_root_directory=dict(type='str', required=True),
             irods_packages_root_directory=dict(type='str', required=True),
             plugin_name=dict(type='str', required=True),
-            target_os_list=dict(type='list', required=True),
             git_repository=dict(type='str', required=True),
             git_commitish=dict(type='str', required=True),
             debug_build=dict(type='bool', required=True),
@@ -167,9 +171,11 @@ def main():
     builder = Builder(module)
     builder.build()
 
-    result = {}
-    result['changed'] = True
-    result['complex_args'] = module.params
+    result = {
+        'changed': True,
+        'complex_args': module.params,
+        'irods_platform_string': get_irods_platform_string(),
+    }
     module.exit_json(**result)
 
 from ansible.module_utils.basic import *
