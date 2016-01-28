@@ -1,89 +1,150 @@
 #!/usr/bin/python
 
+import abc
 import json
 import os
 import pwd
 
-def run_tests(module, result):
-    install_testing_dependencies(module)
-    install_plugin(module)
-    do_globus_config(module)
-    module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test test_irods_auth_plugin_gsi'], check_rc=True)
 
-def install_testing_dependencies(module):
-    module.run_command(['wget', 'http://toolkit.globus.org/ftppub/gt6/installers/repo/globus-toolkit-repo_latest_all.deb'], check_rc=True)
-    install_os_packages_from_files(['globus-toolkit-repo_latest_all.deb'])
-    packages = ['git', 'globus-gsi'] #'libglobus-gsi-callback-dev', 'libglobus-gsi-proxy-core-dev', 'libglobus-gssapi-gsi-dev', 'libglobus-callout-dev', 'libglobus-gss-assist-dev']
-    install_os_packages(packages)
+class UnimplementedStrategy(object):
+    def __init__(self, module):
+        self.module = module
+        self.unimplmented_error()
 
-def install_plugin(module):
-    plugin_directory = os.path.join(module.params['plugin_root_directory'], get_irods_platform_string())
-    plugin_basename = filter(lambda x:module.params['package_prefix']+'-' in x, os.listdir(plugin_directory))[0]
-    package_name = os.path.join(plugin_directory, plugin_basename)
-    install_os_packages_from_files([package_name])
+    def run_tests(self):
+        self.unimplmented_error()
 
-def do_globus_config(module):
-    #globus_client_username = 'globus_client_os_user'
-    #module.run_command(['sudo', 'useradd', globus_client_os_user], check_rc=True)
-    #module.run_command(['sudo', 'mkhomedir_helper', globus_client_username], check_rc=True)
-    #module.run_command(['sudo', 'su', '-', globus_client_username, '-c', ''], check_rc=True)
-    irodsbuild_password = create_irodsbuild_certificate(module)
-    create_irods_certificate(module)
-    generate_proxy(module, 'irodsbuild', irodsbuild_password)
-    generate_proxy(module, 'irods', None)
-    irodsbuild_proxy_copy = make_irods_readable_copy_of_irodsbuild_proxy(module)
-    irodsbuild_distinguished_name = get_irodsbuild_distinguished_name(module)
-    create_test_configuration_json(irodsbuild_proxy_copy, irodsbuild_distinguished_name, module)
+    def unimplemented_error(self):
+        platform = get_platform()
+        distribution = get_distribution()
+        if distribution is not None:
+            msg_platform = '{0} ({1})'.format(platform, distribution)
+        else:
+            msg_platform = platform
+        self.module.fail_json(msg='irods_test_auth_gsi module cannot be used on platform {0}'.format(msg_platform))
 
-def create_irodsbuild_certificate(module):
-    module.run_command(['sudo', 'su', '-', 'irodsbuild', '-c', 'grid-cert-request -nopw -force -cn gsi_client_user'], check_rc=True)
-    module.run_command(['chmod', 'u+w', '~irodsbuild/.globus/userkey.pem'], check_rc=True)
-    private_key_password = 'gsitest'
-    module.run_command(['openssl', 'rsa', '-in', '.globus/userkey.pem', '-out', '~irodsbuild/.globus/userkey.pem', '-des3', '-passout', 'pass:{0}'.format(private_key_password)], check_rc=True)
-    module.run_command(['chmod', '400', '~irodsbuild/.globus/userkey.pem'], check_rc=True)
+class TestRunner(object):
+    platform = 'Generic'
+    distribution = None
+    strategy_class = UnimplementedStrategy
+    def __new__(cls, *args, **kwargs):
+        return load_platform_subclass(TestRunner, args, kwargs)
 
-    temporary_certificate_location = '/tmp/gsicert'
-    module.run_command(['sudo', 'su', '-s', '/bin/bash', '-c', 'grid-ca-sign -in ~irodsbuild/.globus/usercert_request.pem -out {0}'.format(temporary_certificate_location), 'simpleca'], check_rc=True)
+    def __init__(self, module):
+        self.strategy = self.strategy_class(module)
 
-    module.run_command(['cp', temporary_certificate_location, '.globus/usercert.pem'], check_rc=True)
-    module.run_command(['sudo', 'rm', temporary_certificate_location], check_rc=True)
-    return private_key_password
+    def run_tests(self):
+        return self.strategy.run_tests()
 
-def create_irods_certificate(module):
-    module.run_command(['sudo', 'su', '-', 'irods', '-c', 'grid-cert-request -nopw -force -cn irods_service'], check_rc=True)
+class GenericStrategy(object):
+    __metaclass__ = abc.ABCMeta
+    def __init__(self, module):
+        self.module = module
 
-    temporary_certificate_location = '/tmp/gsicert'
-    module.run_command(['sudo', 'su', '-s', '/bin/bash', '-c', 'grid-ca-sign -in ~irods/.globus/usercert_request.pem -out {0}'.format(temporary_certificate_location), 'simpleca'], check_rc=True)
+    @abc.abstractproperty
+    def globus_toolkit_package_name(self):
+        pass
 
-    module.run_command(['sudo', 'cp', temporary_certificate_location, '~irods/.globus/usercert.pem'], check_rc=True)
-    module.run_command(['sudo', 'rm', temporary_certificate_location], check_rc=True)
-    return None
+    def run_tests(self):
+        self.install_testing_dependencies()
+        self.install_plugin()
+        self.do_globus_config()
+        self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test test_irods_auth_plugin_gsi'], check_rc=True)
 
-def generate_proxy(module, username, password):
-    if password:
-        module.run_command(['sudo', 'su', '-', username, '-c' 'echo {0} | grid-proxy-init -pwstdin'.format(password)], check_rc=True)
-    else:
-        module.run_command(['sudo', 'su', '-', username, '-c' 'grid-proxy-init'], check_rc=True)
+    def install_testing_dependencies(self):
+        self.module.run_command(['wget', 'http://toolkit.globus.org/ftppub/gt6/installers/repo/{0}'.format(self.globus_toolkit_package_name)], check_rc=True)
+        install_os_packages_from_files([self.globus_toolkit_package_name])
+        install_os_packages(['globus-gsi']) # 'git'
 
-def make_irods_readable_copy_of_irodsbuild_proxy(module):
-    uid = pwd.getpwnam('irodsbuild').pw_uid
-    proxy_file = '/tmp/x509up_u' + str(uid)
-    irods_copy_of_proxy = '/tmp/irods_copy_of_irodsbuild_gsi_proxy'
-    module.run_command(['sudo', 'cp', proxy_file, irods_copy_of_proxy], check_rc=True)
-    module.run_command(['sudo', 'chown', 'irods:irods', irods_copy_of_proxy], check_rc=True)
-    return irods_copy_of_proxy
+    def install_plugin(self):
+        plugin_directory = os.path.join(self.module.params['plugin_root_directory'], get_irods_platform_string())
+        plugin_basename = filter(lambda x:self.module.params['package_prefix']+'-' in x, os.listdir(plugin_directory))[0]
+        package_name = os.path.join(plugin_directory, plugin_basename)
+        install_os_packages_from_files([package_name])
 
-def get_irodsbuild_distinguished_name(module):
-    _, name, _ = module.run_command(['su', '-', 'irodsbuild', '-c', 'grid-cert-info -subject'], check_rc=True)
-    return name.strip()
+    def do_globus_config(self):
+        self.module.run_command(['chmod', 'o+rx', '/home/irodsbuild'], check_rc=True) # so user simpleca can read ~irodsbuild/.globus/usercert_request.pem
+        irodsbuild_password = self.create_irodsbuild_certificate()
+        self.create_irods_certificate()
+        self.generate_proxy('irodsbuild', irodsbuild_password)
+        self.generate_proxy('irods', None)
+        irodsbuild_proxy_copy = self.make_irods_readable_copy_of_irodsbuild_proxy()
+        irodsbuild_distinguished_name = self.get_irodsbuild_distinguished_name()
+        self.create_test_configuration_json(irodsbuild_proxy_copy, irodsbuild_distinguished_name)
 
-def create_test_configuration_json(irodsbuild_proxy_copy, irodsbuild_distinguished_name, module):
-    config = {'client_user_proxy': irodsbuild_proxy_copy,
-              'client_user_DN': irodsbuild_distinguished_name}
-    config_file = '/tmp/gsi_test_cfg.json'
-    with open(config_file, 'w') as f:
-        json.dump(config, f)
-    module.run_command(['sudo', 'chmod', '777', config_file], check_rc=True)
+    def create_irodsbuild_certificate(self):
+        self.module.run_command(['sudo', 'su', '-', 'irodsbuild', '-c', 'grid-cert-request -nopw -force -cn gsi_client_user'], check_rc=True)
+        self.module.run_command(['chmod', 'u+w', '~irodsbuild/.globus/userkey.pem'], check_rc=True)
+        private_key_password = 'gsitest'
+        self.module.run_command(['openssl', 'rsa', '-in', '.globus/userkey.pem', '-out', '~irodsbuild/.globus/userkey.pem', '-des3', '-passout', 'pass:{0}'.format(private_key_password)], check_rc=True)
+        self.module.run_command(['chmod', '400', '~irodsbuild/.globus/userkey.pem'], check_rc=True)
+
+        temporary_certificate_location = '/tmp/gsicert'
+        self.module.run_command(['sudo', 'su', '-s', '/bin/bash', '-c', 'grid-ca-sign -in ~irodsbuild/.globus/usercert_request.pem -out {0}'.format(temporary_certificate_location), 'simpleca'], check_rc=True)
+
+        self.module.run_command(['cp', temporary_certificate_location, '.globus/usercert.pem'], check_rc=True)
+        self.module.run_command(['sudo', 'rm', temporary_certificate_location], check_rc=True)
+        return private_key_password
+
+    def create_irods_certificate(self):
+        self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'grid-cert-request -nopw -force -cn irods_service'], check_rc=True)
+
+        temporary_certificate_location = '/tmp/gsicert'
+        self.module.run_command(['sudo', 'su', '-s', '/bin/bash', '-c', 'grid-ca-sign -in ~irods/.globus/usercert_request.pem -out {0}'.format(temporary_certificate_location), 'simpleca'], check_rc=True)
+
+        self.module.run_command(['sudo', 'cp', temporary_certificate_location, '~irods/.globus/usercert.pem'], check_rc=True)
+        self.module.run_command(['sudo', 'rm', temporary_certificate_location], check_rc=True)
+
+    def generate_proxy(self, username, password):
+        if password:
+            self.module.run_command(['sudo', 'su', '-', username, '-c' 'echo {0} | grid-proxy-init -pwstdin'.format(password)], check_rc=True)
+        else:
+            self.module.run_command(['sudo', 'su', '-', username, '-c' 'grid-proxy-init'], check_rc=True)
+
+    def make_irods_readable_copy_of_irodsbuild_proxy(self):
+        uid = pwd.getpwnam('irodsbuild').pw_uid
+        proxy_file = '/tmp/x509up_u' + str(uid)
+        irods_copy_of_proxy = '/tmp/irods_copy_of_irodsbuild_gsi_proxy'
+        self.module.run_command(['sudo', 'cp', proxy_file, irods_copy_of_proxy], check_rc=True)
+        self.module.run_command(['sudo', 'chown', 'irods:irods', irods_copy_of_proxy], check_rc=True)
+        return irods_copy_of_proxy
+
+    def get_irodsbuild_distinguished_name(self):
+        _, name, _ = self.module.run_command(['su', '-', 'irodsbuild', '-c', 'grid-cert-info -subject'], check_rc=True)
+        return name.strip()
+
+    def create_test_configuration_json(self, irodsbuild_proxy_copy, irodsbuild_distinguished_name):
+        config = {'client_user_proxy': irodsbuild_proxy_copy,
+                  'client_user_DN': irodsbuild_distinguished_name}
+        config_file = '/tmp/gsi_test_cfg.json'
+        with open(config_file, 'w') as f:
+            json.dump(config, f)
+        self.module.run_command(['sudo', 'chmod', '777', config_file], check_rc=True)
+
+class DebianStrategy(GenericStrategy):
+    @property
+    def globus_toolkit_package_name(self):
+        return 'globus-toolkit-repo_latest_all.deb'
+
+class RedHatStrategy(GenericStrategy):
+    @property
+    def globus_toolkit_package_name(self):
+        return 'globus-toolkit-repo-latest.noarch.rpm'
+
+class CentOS6TestRunner(TestRunner):
+    platform = 'Linux'
+    distribution = 'Centos'
+    strategy_class = RedHatStrategy
+
+class CentOS7TestRunner(TestRunner):
+    platform = 'Linux'
+    distribution = 'Centos linux'
+    strategy_class = RedHatStrategy
+
+class UbuntuTestRunner(TestRunner):
+    platform = 'Linux'
+    distribution = 'Ubuntu'
+    strategy_class = DebianStrategy
 
 def main():
     module = AnsibleModule(
@@ -95,11 +156,13 @@ def main():
         supports_check_mode=False,
     )
 
-    result = {}
-    run_tests(module, result)
+    test_runner = TestRunner(module)
+    test_runner.run_tests()
 
-    result['changed'] = True
-    result['complex_args'] = module.params
+    result = {
+        'changed': True,
+        'complex_args': module.params,
+    }
 
     module.exit_json(**result)
 

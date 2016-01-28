@@ -62,7 +62,7 @@ class GenericStrategy(object):
     def run_tests(self):
         self.install_testing_dependencies()
         self.install_plugin()
-        self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test test_irods_auth_plugin_krb.Test_Authentication'], check_rc=True)
+        self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test test_irods_auth_plugin_krb'], check_rc=True)
 
     def install_testing_dependencies(self):
         add_shortname_to_etc_hosts()
