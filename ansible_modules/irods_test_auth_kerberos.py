@@ -62,7 +62,7 @@ class GenericStrategy(object):
     def run_tests(self):
         self.install_testing_dependencies()
         self.install_plugin()
-        self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test test_irods_auth_plugin_krb'], check_rc=True)
+        self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test {0}'.format(self.module.params['python_test_module_to_run'])], check_rc=True)
 
     def install_testing_dependencies(self):
         add_shortname_to_etc_hosts()
@@ -123,8 +123,8 @@ ktadd -k /var/lib/irods/irods.keytab irods/icat.example.org@EXAMPLE.ORG
         self.module.run_command(['chmod', 'o+r', ticket_cache_file], check_rc=True)
 
     def install_plugin(self):
-        plugin_directory = os.path.join(self.module.params['plugin_root_directory'], get_irods_platform_string())
-        plugin_basename = filter(lambda x:self.module.params['package_prefix']+'-' in x, os.listdir(plugin_directory))[0]
+        plugin_directory = os.path.join(self.module.params['plugin_package_root_directory'], get_irods_platform_string())
+        plugin_basename = filter(lambda x:self.module.params['plugin_package_prefix']+'-' in x, os.listdir(plugin_directory))[0]
         package_name = os.path.join(plugin_directory, plugin_basename)
         install_os_packages_from_files([package_name])
 
@@ -304,8 +304,9 @@ class UbuntuTestRunner(TestRunner):
 def main():
     module = AnsibleModule(
         argument_spec = dict(
-            plugin_root_directory=dict(type='str', required=True),
-            package_prefix=dict(type='str', required=True),
+            plugin_package_root_directory=dict(type='str', required=True),
+            plugin_package_prefix=dict(type='str', required=True),
+            python_test_module_to_run=dict(type='str', required=True),
             output_directory=dict(type='str', required=True),
         ),
         supports_check_mode=False,

@@ -16,11 +16,11 @@ def vm_manager(vm_names):
     finally:
         destroy_build_vms(vm_names)
 
-def build(build_name, output_root_directory, irods_packages_root_directory, plugin_name, git_repository, git_commitish, platform_targets, debug_build):
+def build(build_name, output_root_directory, irods_packages_root_directory, git_repository, git_commitish, platform_targets, debug_build):
     os.makedirs(output_root_directory)
     vm_names, ip_addresses = deploy_build_vms_return_names_and_ips(build_name, platform_targets, output_root_directory)
     with vm_manager(vm_names):
-        build_plugin_on_vms(ip_addresses, output_root_directory, irods_packages_root_directory, plugin_name, git_repository, git_commitish, platform_targets, debug_build)
+        build_plugin_on_vms(ip_addresses, output_root_directory, irods_packages_root_directory, git_repository, git_commitish, platform_targets, debug_build)
 
 def deploy_build_vms_return_names_and_ips(build_name, platform_targets, output_root_directory):
     def generate_vm_name(build_name, os_name, os_version):
@@ -38,11 +38,10 @@ def deploy_build_vms_return_names_and_ips(build_name, platform_targets, output_r
     ip_addresses = [result.get() for result in proc_pool_results]
     return vm_names, ip_addresses
 
-def build_plugin_on_vms(ip_addresses, output_root_directory, irods_packages_root_directory, plugin_name, git_repository, git_commitish, platform_targets, debug_build):
+def build_plugin_on_vms(ip_addresses, output_root_directory, irods_packages_root_directory, git_repository, git_commitish, platform_targets, debug_build):
     complex_args = {
         'output_root_directory': output_root_directory,
         'irods_packages_root_directory': irods_packages_root_directory,
-        'plugin_name': plugin_name,
         'git_repository': git_repository,
         'git_commitish': git_commitish,
         'debug_build': debug_build,
@@ -62,7 +61,6 @@ if __name__ == '__main__':
     parser.add_argument('--build_name', type=str, required=True)
     parser.add_argument('--output_root_directory', type=str, required=True)
     parser.add_argument('--irods_packages_root_directory', type=str, required=True),
-    parser.add_argument('--plugin_name', type=str, required=True)
     parser.add_argument('--git_repository', type=str, required=True)
     parser.add_argument('--git_commitish', type=str, required=True)
     parser.add_argument('--platform_targets', type=str, required=True)
@@ -73,4 +71,4 @@ if __name__ == '__main__':
     library.register_log_handlers()
     library.convert_sigterm_to_exception()
 
-    build(args.build_name, args.output_root_directory, args.irods_packages_root_directory, args.plugin_name, args.git_repository, args.git_commitish, args.platform_targets, args.debug_build)
+    build(args.build_name, args.output_root_directory, args.irods_packages_root_directory, args.git_repository, args.git_commitish, args.platform_targets, args.debug_build)

@@ -43,8 +43,7 @@ class GenericStrategy(object):
         self.irods_packages_root_directory = module.params['irods_packages_root_directory']
         self.git_repository = module.params['git_repository']
         self.git_commitish = module.params['git_commitish']
-        self.plugin_name = module.params['plugin_name']
-        self.local_plugin_dir = os.path.expanduser('~/'+self.plugin_name)
+        self.local_plugin_dir = os.path.expanduser('~/irods_build_local_plugin_dir')
 
     @abc.abstractproperty
     def building_dependencies(self):
@@ -160,7 +159,6 @@ def main():
         argument_spec = dict(
             output_root_directory=dict(type='str', required=True),
             irods_packages_root_directory=dict(type='str', required=True),
-            plugin_name=dict(type='str', required=True),
             git_repository=dict(type='str', required=True),
             git_commitish=dict(type='str', required=True),
             debug_build=dict(type='bool', required=True),
