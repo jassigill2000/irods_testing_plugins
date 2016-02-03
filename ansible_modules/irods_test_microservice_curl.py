@@ -8,9 +8,10 @@ import shutil
 import socket
 import subprocess
 
+
 def run_tests(module):
     install_plugin_package(module)
-    module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test test_irods_resource_plugin_s3'], check_rc=True)
+    module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test test_irods_microservice_plugins_curl'], check_rc=True)
 
 def install_plugin_package(module):
     plugin_directory = os.path.join(module.params['plugin_root_directory'], get_irods_platform_string())

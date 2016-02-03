@@ -54,7 +54,7 @@ class GenericStrategy(object):
     def install_testing_dependencies(self):
         self.module.run_command(['wget', 'http://toolkit.globus.org/ftppub/gt6/installers/repo/{0}'.format(self.globus_toolkit_package_name)], check_rc=True)
         install_os_packages_from_files([self.globus_toolkit_package_name])
-        install_os_packages(['globus-gsi']) # 'git'
+        install_os_packages(['globus-gsi'])
 
     def install_plugin(self):
         plugin_directory = os.path.join(self.module.params['plugin_root_directory'], get_irods_platform_string())
