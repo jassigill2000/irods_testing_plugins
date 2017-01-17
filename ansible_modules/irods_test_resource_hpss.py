@@ -10,7 +10,11 @@ import subprocess
 
 def run_tests(module):
     install_testing_dependencies(module)
-    module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test {0}'.format(module.params['python_test_module_to_run'])], check_rc=True)
+    if get_irods_version() >= (4, 2):
+        pass
+        module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd scripts; python run_tests.py --xml_output --run_specific_test {0}'.format(module.params['python_test_module_to_run'])], check_rc=True)
+    else:
+        module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test {0}'.format(module.params['python_test_module_to_run'])], check_rc=True)
 
 def install_testing_dependencies(module):
     install_hpss_plugin(module)
@@ -18,16 +22,23 @@ def install_testing_dependencies(module):
 
 def install_hpss_plugin(module):
     plugin_directory = os.path.join(module.params['plugin_package_root_directory'],get_irods_platform_string())
-    plugin_basename = filter(lambda x:module.params['plugin_package_prefix']+'-' in x, os.listdir(plugin_directory))[0]
+    plugin_basename = filter(lambda x:module.params['plugin_package_prefix'] in x, os.listdir(plugin_directory))[0]
     package_name = os.path.join(plugin_directory, plugin_basename)
     module.run_command(['sudo', 'rpm', '-i', '--nodeps', package_name], check_rc=True)
     #install_os_packages_from_files(['--skip-broken', package_name])
+
+def add_LD_PRELOAD_to_server_config():
+    with open('/etc/irods/server_config.json') as f:
+        d = json.load(f)
+    d['environment_variables']['LD_PRELOAD'] = '/lib64/libtirpc.so'
+    with open('/etc/irods/server_config.json', 'w') as f:
+        json.dump(d, f, sort_keys=True, indent=4)
 
 def configure_hpss(module):
     module.run_command(['passwd', 'irods'], data='notasecret\nnotasecret\n', check_rc=True)
     module.run_command(['sed', '-i', '/hpss743.example.org/ s/$/ hpss743/', '/etc/hosts'], check_rc=True)
     module.run_command(['ln', '-s', '/lib64/libtirpc.so.1', '/lib64/libtirpc.so'], check_rc=True)
-    module.run_command(['/var/lib/irods/packaging/update_json.py', '/etc/irods/server_config.json', 'string', 'environment_variables,LD_PRELOAD', '/lib64/libtirpc.so'], check_rc=True)
+    add_LD_PRELOAD_to_server_config()
     module.run_command(['sed', '-i', '/^ALL:.*DENY$/d', '/etc/hosts.allow'], check_rc=True)
     module.run_command(['/etc/init.d/rpcbind', 'restart'], check_rc=True)
     module.run_command(['/opt/hpss/bin/rc.hpss', 'start'], check_rc=True)

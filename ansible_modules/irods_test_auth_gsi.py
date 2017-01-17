@@ -49,7 +49,10 @@ class GenericStrategy(object):
         self.install_testing_dependencies()
         self.install_plugin()
         self.do_globus_config()
-        self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test {0}'.format(self.module.params['python_test_module_to_run'])], check_rc=True)
+        if get_irods_version() >= (4, 2):
+            self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd scripts; python run_tests.py --xml_output --run_specific_test {0}'.format(self.module.params['python_test_module_to_run'])], check_rc=True)
+        else:
+            self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test {0}'.format(self.module.params['python_test_module_to_run'])], check_rc=True)
 
     def install_testing_dependencies(self):
         self.module.run_command(['wget', 'http://toolkit.globus.org/ftppub/gt6/installers/repo/{0}'.format(self.globus_toolkit_package_name)], check_rc=True)
@@ -58,7 +61,7 @@ class GenericStrategy(object):
 
     def install_plugin(self):
         plugin_directory = os.path.join(self.module.params['plugin_package_root_directory'], get_irods_platform_string())
-        plugin_basename = filter(lambda x:self.module.params['plugin_package_prefix']+'-' in x, os.listdir(plugin_directory))[0]
+        plugin_basename = filter(lambda x:self.module.params['plugin_package_prefix'] in x, os.listdir(plugin_directory))[0]
         package_name = os.path.join(plugin_directory, plugin_basename)
         install_os_packages_from_files([package_name])
 

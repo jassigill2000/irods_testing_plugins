@@ -62,7 +62,10 @@ class GenericStrategy(object):
     def run_tests(self):
         self.install_testing_dependencies()
         self.install_plugin()
-        self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test {0}'.format(self.module.params['python_test_module_to_run'])], check_rc=True)
+        if get_irods_version() >= (4, 2):
+            self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd scripts; python run_tests.py --xml_output --run_specific_test {0}'.format(self.module.params['python_test_module_to_run'])], check_rc=True)
+        else:
+            self.module.run_command(['sudo', 'su', '-', 'irods', '-c', 'cd tests/pydevtest; python run_tests.py --xml_output --run_specific_test {0}'.format(self.module.params['python_test_module_to_run'])], check_rc=True)
 
     def install_testing_dependencies(self):
         add_shortname_to_etc_hosts()
@@ -104,7 +107,10 @@ ktadd -k /var/lib/irods/irods.keytab irods/icat.example.org@EXAMPLE.ORG
         self.module.run_command(['chown', 'irods:irods', '/var/lib/irods/irods.keytab'], check_rc=True)
 
     def restart_irods(self):
-        self.module.run_command(['su', '-', 'irods', '-c', '/var/lib/irods/iRODS/irodsctl restart'], check_rc=True)
+        if get_irods_version() >= (4, 2):
+            self.module.run_command(['su', '-', 'irods', '-c', '/var/lib/irods/irodsctl restart'], check_rc=True)
+        else:
+            self.module.run_command(['su', '-', 'irods', '-c', '/var/lib/irods/iRODS/irodsctl restart'], check_rc=True)
 
     def create_ticket_granting_ticket(self):
         self.module.run_command(['kinit', 'krb_user'], data='{0}\n'.format(self.unprivileged_principal_password), check_rc=True)
@@ -124,7 +130,7 @@ ktadd -k /var/lib/irods/irods.keytab irods/icat.example.org@EXAMPLE.ORG
 
     def install_plugin(self):
         plugin_directory = os.path.join(self.module.params['plugin_package_root_directory'], get_irods_platform_string())
-        plugin_basename = filter(lambda x:self.module.params['plugin_package_prefix']+'-' in x, os.listdir(plugin_directory))[0]
+        plugin_basename = filter(lambda x:self.module.params['plugin_package_prefix'] in x, os.listdir(plugin_directory))[0]
         package_name = os.path.join(plugin_directory, plugin_basename)
         install_os_packages_from_files([package_name])
 
