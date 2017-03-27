@@ -1,13 +1,11 @@
 import argparse
 import json
-import logging
 import os
 
 import library
 
 
 def main(zone_bundle, deployment_name, irods_core_packages_root_directory, plugin_package_root_directory, plugin_package_prefix, ansible_module_to_run, python_test_module_to_run, output_directory):
-    logger = logging.getLogger(__name__)
     zone_bundle_output_file = os.path.join(output_directory, 'deployed_zone.json')
     version_to_packages_map = {
         'deployment-determined': irods_core_packages_root_directory,
