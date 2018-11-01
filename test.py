@@ -5,12 +5,12 @@ import os
 import library
 
 
-def main(zone_bundle, deployment_name, irods_core_packages_root_directory, plugin_package_root_directory, plugin_package_prefix, ansible_module_to_run, python_test_module_to_run, output_directory):
+def main(zone_bundle, deployment_name, irods_core_packages_root_directory, plugin_package_root_directory, plugin_package_prefix, mungefs_packages_root_dir, ansible_module_to_run, python_test_module_to_run, output_directory):
     zone_bundle_output_file = os.path.join(output_directory, 'deployed_zone.json')
     version_to_packages_map = {
         'deployment-determined': irods_core_packages_root_directory,
     }
-    deployed_zone_bundle = library.deploy(zone_bundle, deployment_name, version_to_packages_map, zone_bundle_output_file)
+    deployed_zone_bundle = library.deploy(zone_bundle, deployment_name, version_to_packages_map, mungefs_packages_root_dir, zone_bundle_output_file)
     with library.deployed_zone_bundle_manager(deployed_zone_bundle):
         icat_ip = deployed_zone_bundle['zones'][0]['icat_server']['deployment_information']['ip_address']
 
@@ -33,6 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--irods_core_packages_root_directory', type=str, required=True)
     parser.add_argument('--plugin_package_root_directory', type=str, required=True)
     parser.add_argument('--plugin_package_prefix', type=str, required=True)
+    parser.add_argument('--mungefs_packages_root_dir', type=str, required=False, default=None)
     parser.add_argument('--ansible_module_to_run', type=str, required=True)
     parser.add_argument('--python_test_module_to_run', type=str, required=True)
     parser.add_argument('--output_directory', type=str, required=True)
@@ -44,4 +45,4 @@ if __name__ == '__main__':
     library.register_log_handlers()
     library.convert_sigterm_to_exception()
 
-    main(zone_bundle, args.deployment_name, args.irods_core_packages_root_directory, args.plugin_package_root_directory, args.plugin_package_prefix, args.ansible_module_to_run, args.python_test_module_to_run, args.output_directory)
+    main(zone_bundle, args.deployment_name, args.irods_core_packages_root_directory, args.plugin_package_root_directory, args.plugin_package_prefix, args.mungefs_packages_root_dir, args.ansible_module_to_run, args.python_test_module_to_run, args.output_directory)
